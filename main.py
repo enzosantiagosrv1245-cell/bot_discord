@@ -10,6 +10,7 @@ from aiohttp import web
 # ═══════════════════════════════════════════════════════════════
 #                    🤖 DEV BOT - MAIN FILE
 #                   Sistema de Tickets com IA
+#                   Configurado para Render Web Service
 # ═══════════════════════════════════════════════════════════════
 
 # Carregar variáveis de ambiente
@@ -103,19 +104,100 @@ bot = commands.Bot(
 
 async def health_check(request):
     """Endpoint de health check para manter o bot ativo"""
-    uptime = datetime.now() - bot.start_time if hasattr(bot, 'start_time') else 'N/A'
+    uptime = datetime.now() - bot.start_time if hasattr(bot, 'start_time') else datetime.now()
+    uptime_str = str(uptime).split('.')[0]  # Remover microsegundos
+    
     return web.json_response({
         'status': 'online',
-        'bot': bot.user.name if bot.user else 'Not ready',
-        'uptime': str(uptime),
+        'bot': bot.user.name if bot.user else 'Starting...',
+        'bot_id': bot.user.id if bot.user else None,
+        'uptime': uptime_str,
         'guilds': len(bot.guilds),
-        'latency': round(bot.latency * 1000, 2)
+        'users': sum(g.member_count for g in bot.guilds),
+        'latency_ms': round(bot.latency * 1000, 2),
+        'prefix': config['prefix'],
+        'timestamp': datetime.now().isoformat()
     })
+
+async def root_handler(request):
+    """Handler para rota raiz"""
+    return web.Response(
+        text=f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Discord Bot - DevBot</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }}
+        .container {{
+            text-align: center;
+            background: rgba(255,255,255,0.1);
+            padding: 3rem;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }}
+        h1 {{ font-size: 3rem; margin: 0; }}
+        .status {{ 
+            display: inline-block;
+            background: #00ff00;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }}
+        @keyframes pulse {{
+            0%, 100% {{ opacity: 1; }}
+            50% {{ opacity: 0.5; }}
+        }}
+        .info {{ margin-top: 2rem; font-size: 1.2rem; }}
+        a {{ 
+            color: #fff; 
+            text-decoration: none;
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin: 10px;
+            display: inline-block;
+            transition: all 0.3s;
+        }}
+        a:hover {{ background: rgba(255,255,255,0.3); }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 DevBot</h1>
+        <p><span class="status"></span>Bot Online</p>
+        <div class="info">
+            <p>✨ Sistema de Tickets com IA</p>
+            <p>🛡️ Moderação Avançada</p>
+            <p>💻 Ferramentas para Desenvolvedores</p>
+        </div>
+        <div style="margin-top: 2rem;">
+            <a href="/health">📊 Status JSON</a>
+            <a href="https://discord.com/api/oauth2/authorize?client_id={bot.user.id if bot.user else 'ID'}&permissions=8&scope=bot%20applications.commands">➕ Adicionar ao Discord</a>
+        </div>
+    </div>
+</body>
+</html>
+        """,
+        content_type='text/html'
+    )
 
 async def start_health_server():
     """Inicia servidor HTTP para health checks"""
     app = web.Application()
-    app.router.add_get('/', health_check)
+    app.router.add_get('/', root_handler)
     app.router.add_get('/health', health_check)
     
     port = int(os.getenv('PORT', 8080))
@@ -124,6 +206,7 @@ async def start_health_server():
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
     print(f"🌐 Health check server running on port {port}")
+    print(f"🔗 Access: http://0.0.0.0:{port}")
 
 # ═══════════════════════════════════════════════════════════════
 #                         KEEP ALIVE TASK
@@ -132,7 +215,12 @@ async def start_health_server():
 @tasks.loop(minutes=10)
 async def keep_alive():
     """Mantém o bot ativo com ping periódico"""
-    print(f"🔄 Keep alive ping - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} - Latency: {round(bot.latency * 1000)}ms")
+    guilds = len(bot.guilds)
+    users = sum(g.member_count for g in bot.guilds)
+    latency = round(bot.latency * 1000)
+    
+    print(f"🔄 Keep alive - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+    print(f"   📊 Servidores: {guilds} | Usuários: {users} | Latência: {latency}ms")
 
 @keep_alive.before_loop
 async def before_keep_alive():
@@ -158,7 +246,7 @@ async def on_ready():
 ║  Usuários: {sum(g.member_count for g in bot.guilds)}
 ║  Prefixo: {config['prefix']}
 ║  Discord.py: {discord.__version__}
-║  Ambiente: {'PRODUÇÃO' if os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('RENDER') else 'LOCAL'}
+║  Porta HTTP: {os.getenv('PORT', '8080')}
 ╚══════════════════════════════════════════════════════════════╝
     """)
     
@@ -183,10 +271,8 @@ async def on_ready():
                 json.dump({}, f)
             print(f"✅ Criado: {filepath}")
     
-    # Iniciar health check server (para Render/Railway)
-    if os.getenv('RENDER') or os.getenv('RAILWAY_ENVIRONMENT'):
-        asyncio.create_task(start_health_server())
-        print("🌐 Health check server iniciado")
+    # Sempre iniciar health check server
+    asyncio.create_task(start_health_server())
     
     # Iniciar keep alive task
     if not keep_alive.is_running():
@@ -211,7 +297,6 @@ async def on_guild_join(guild):
     
     # Enviar mensagem de boas-vindas
     try:
-        # Tentar encontrar canal de sistema
         channel = guild.system_channel or guild.text_channels[0]
         
         embed = discord.Embed(
@@ -229,9 +314,6 @@ Olá! Eu sou o **{bot.user.name}**, um bot completo de tickets e moderação par
 • Comandos de moderação
 • Ferramentas para desenvolvedores
 • Utilidades gerais
-
-**🔗 Links Úteis:**
-• [Documentação](#) | [Suporte](#) | [Convite](#)
             """,
             color=discord.Color.blurple(),
             timestamp=datetime.now()
@@ -328,7 +410,6 @@ async def help_command(ctx, comando: str = None):
     """Mostra todos os comandos disponíveis"""
     
     if comando:
-        # Ajuda de comando específico
         cmd = bot.get_command(comando)
         if not cmd:
             await ctx.send(f"❌ Comando `{comando}` não encontrado!")
@@ -349,7 +430,6 @@ async def help_command(ctx, comando: str = None):
         await ctx.send(embed=embed)
         return
     
-    # Lista de comandos
     embed = discord.Embed(
         title="📚 Central de Comandos",
         description=f"Use `{ctx.prefix}help <comando>` para mais informações sobre um comando específico.",
@@ -359,7 +439,6 @@ async def help_command(ctx, comando: str = None):
     
     embed.set_thumbnail(url=bot.user.display_avatar.url)
     
-    # Agrupar comandos por cog
     for cog_name, cog in bot.cogs.items():
         commands_list = [cmd for cmd in cog.get_commands() if not cmd.hidden]
         if commands_list:
@@ -372,7 +451,6 @@ async def help_command(ctx, comando: str = None):
                 inline=False
             )
     
-    # Comandos sem cog
     no_cog = [cmd for cmd in bot.commands if not cmd.cog and not cmd.hidden]
     if no_cog:
         commands_text = ", ".join(f"`{cmd.name}`" for cmd in no_cog)
@@ -406,10 +484,8 @@ async def load_cogs():
 async def main():
     """Função principal para iniciar o bot"""
     async with bot:
-        # Carregar cogs
         await load_cogs()
         
-        # Iniciar bot
         try:
             print("🚀 Iniciando bot...")
             await bot.start(config['token'])

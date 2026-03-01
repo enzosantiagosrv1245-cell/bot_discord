@@ -1,19 +1,23 @@
-cat > start.sh << 'EOF'
 #!/bin/bash
 
-# Criar diretórios necessários
+# Criar diretórios
 mkdir -p data
 
-# Criar arquivos JSON se não existirem
-for file in tickets.json warnings.json blacklist.json prefixes.json; do
-    if [ ! -f "data/$file" ]; then
-        echo "{}" > "data/$file"
-    fi
-done
+# Criar arquivos JSON vazios
+echo '{}' > data/tickets.json
+echo '{}' > data/warnings.json
+echo '{}' > data/blacklist.json
+echo '{}' > data/prefixes.json
 
-# Iniciar o bot
+# Mostrar info de debug
+echo "📦 Python version:"
+python --version
+
+echo "📦 Installed packages:"
+pip list
+
+echo "🔑 Environment variables (sem mostrar token):"
+env | grep -v TOKEN
+
+echo "🚀 Starting bot..."
 python main.py
-EOF
-
-# Dar permissão de execução
-chmod +x start.sh

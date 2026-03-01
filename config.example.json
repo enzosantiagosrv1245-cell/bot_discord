@@ -1,0 +1,13 @@
+
+{
+    "token": "COLE_SEU_TOKEN_AQUI",
+    "prefix": "dev!",
+    "owner_ids": [
+        123456789012345678
+    ],
+    "staff_role_id": null,
+    "log_channel_id": null,
+    "ticket_category_id": null,
+    "ai_enabled": true,
+    "auto_close_minutes": 60
+}

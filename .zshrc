@@ -15,3 +15,4 @@ git-safe-commit() {
 }
 
 alias gcommit='git-safe-commit'
+//a

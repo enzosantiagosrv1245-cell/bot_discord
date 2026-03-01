@@ -1,23 +1,23 @@
 #!/bin/bash
 
-# Criar diretórios
+# Criar diretórios necessários
 mkdir -p data
 
-# Criar arquivos JSON vazios
-echo '{}' > data/tickets.json
-echo '{}' > data/warnings.json
-echo '{}' > data/blacklist.json
-echo '{}' > data/prefixes.json
+# Criar arquivos JSON vazios se não existirem
+for file in tickets.json warnings.json blacklist.json prefixes.json; do
+    if [ ! -f "data/$file" ]; then
+        echo '{}' > "data/$file"
+    fi
+done
 
-# Mostrar info de debug
-echo "📦 Python version:"
-python --version
+# Debug info
+echo "🐍 Python version: $(python --version)"
+echo "📦 Pip version: $(pip --version)"
+echo "🔑 Checking environment variables..."
+echo "   BOT_PREFIX: ${BOT_PREFIX:-not set}"
+echo "   OWNER_IDS: ${OWNER_IDS:-not set}"
+echo "   PORT: ${PORT:-not set}"
 
-echo "📦 Installed packages:"
-pip list
-
-echo "🔑 Environment variables (sem mostrar token):"
-env | grep -v TOKEN
-
+# Iniciar bot
 echo "🚀 Starting bot..."
-python main.py
+exec python main.py
